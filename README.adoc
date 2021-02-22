@@ -1,0 +1,178 @@
+= Kotlin/JS + Tailwind CSS =
+
+This is a small sample repository to show the idiomatic way of configuring these two systems together.
+
+== Running it ==
+
+. Run `./gradlew run`.
+. Open `http://localhost:8080/` in your browser.
+. 🎉 Notice we're using Tailwind CSS classes successfully.
+
+== How To ==
+
+Steps taken to make this work:
+
+=== Dependencies ===
+
+Add the following dependencies to your JS target (`jsMain` dependencies) in your Gradle file:
+
+[source,kotlin]
+----
+implementation("org.jetbrains:kotlin-extensions:1.0.1-pre.148-kotlin-1.4.21")
+implementation(npm("postcss", "8.2.6"))
+implementation(npm("postcss-loader", "4.2.0")) // 5.0.0 seems not to work
+implementation(npm("autoprefixer", "10.2.4"))
+implementation(npm("tailwindcss", "2.0.3"))
+----
+
+* `kotlin-extensions` is necessary to get the JavaScript link:https://github.com/JetBrains/kotlin-wrappers/blob/master/kotlin-extensions/src/main/kotlin/kotlinext/js/CommonJS.kt#L20[`require`] function.
+** Make sure the version number matches your version of the Kotlin multiplatform plugin at the top of your Gradle file.
+** Kotlin Multiplatform 1.4.30 gave me `No descriptor found for library` errors. Try 1.4.21.
+** Find the latest versions link:https://bintray.com/kotlin/kotlin-js-wrappers/kotlin-extensions[here].
+* `postcss` and `autoprefixer` are link:https://tailwindcss.com/docs/installation#install-tailwind-via-npm[dependencies] as mentioned in the Tailwind CSS docs.
+* `postcss-loader` is required because Kotlin/JS is built on top of Webpack.
+** Note that while 5.0.0 is out, using it gave me build errors. The latest 4.x seems to work.
+* `tailwindcss` is obviously what we're here for.
+
+=== Add Tailwind as a PostCSS plugin ===
+
+Just do link:https://tailwindcss.com/docs/installation#add-tailwind-as-a-post-css-plugin[this step].
+
+If unsure, create this file in your project root:
+
+[source,javascript]
+----
+// postcss.config.js
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  }
+}
+----
+
+=== Create your configuration file (optional) ===
+
+link:https://tailwindcss.com/docs/installation#create-your-configuration-file[Official documentation].
+
+Creating the `tailwind.config.js` file is a little tricky because simply `npx` won't work, as we haven't installed any
+`node_modules`. Fortunately, Kotlin/JS has already done this for us.
+
+Run the following:
+
+[source,shell]
+----
+$ ./gradlew kotlinNpmInstall
+$ ( cd build/js/ && npx tailwindcss init && mv tailwind.config.js ../../ )
+----
+
+This generates `tailwind.config.js` in the `build/js/` directory and then moves it up two directories to the project
+root. Kotlin/JS generates the node modules into `build/js/node_modules` when the `kotlinNpmInstall` task runs.
+
+This assumes your JavaScript module is `js`. If it's not, you'll need to change the `cd build/js/` part. If you're not
+sure where your `node_modules` directory is, run `find . -maxdepth 3 -name node_modules`.
+
+You should now have all your dependencies set up and config files created.
+
+=== Create and Reference a Regular CSS File ===
+
+_If you already have a CSS file that you're loading in your app, you can skip this step._
+
+Create `app.css` in your `jsMain/resources/` directory. Put something obvious in there so you know
+when it's loaded:
+
+[source,css]
+----
+body {
+    background-color: red;
+}
+----
+
+This file will get copied into the same folder as your transpiled JavaScript files.
+
+In your JavaScript file (`client.kt` in this package), add:
+
+[source,javascript]
+----
+kotlinext.js.require("./app.css")
+----
+
+to your `main` method. You can of course import the `require` method if you prefer.
+
+If you run `./gradlew run`, you should be able to see a red page at `http://localhost:8080/`.
+
+We're almost there, but we have two more steps: tell Webpack to use PostCSS and to finally inject Tailwind CSS.
+
+=== Using PostCSS with Webpack ===
+
+We want to "monkeypatch" the Webpack configuration that Kotlin/JS generates for us. This hook is
+documented in the link:https://kotlinlang.org/docs/js-project-setup.html#webpack-bundling[webpack bundling] section. Basically, if we create .js files in `webpack.config.d/`, they'll be automatically
+merged into `build/js/packages/projectName/webpack.config.js`, which exists after a build and you can go inspect.
+
+The "problem", if you have `cssSupport.enabled = true` in your Gradle file (which you should!), is that this line
+generates a webpack rule matching `/\.css$/`. We can't simply create another rule matching the same files...that
+won't work.
+
+So, we need to find the original rule and modify it. Create the following file relative to your project root:
+
+[source,javascript]
+----
+// in webpack.config.d/postcss-loader.config.js
+
+(() => {
+    const cssRule = config.module.rules.find(r => "test.css".match(r.test));
+    if (!cssRule) {
+        throw new Error("Could not resolve webpack rule matching .css files.");
+    }
+    cssRule.use.push({
+        loader: "postcss-loader",
+        options: {}
+    });
+})();
+----
+
+We use an IIFE so that our new variable doesn't potentially interfere with other unseen variables.
+
+Now PostCSS is working!
+
+With PostCSS configured and the `tailwindcss` npm module in our dependencies, all that's left now
+is to use it.
+
+=== Importing Tailwind CSS ===
+
+We're basically smooth sailing from here. Follow the link:https://tailwindcss.com/docs/installation#include-tailwind-in-your-css[Include Tailwind in your CSS] directions.
+
+Just stick the following in your `app.css`:
+
+[source,css]
+----
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+----
+
+If you start the server again, it should **Just Work**! It's a bit hard to tell, but if you check the devtools,
+you should see the tw classes loading and massive js.js file being loaded (9.20mb!) which contains all of Tailwind CSS.
+
+== Areas for Improvement ==
+
+=== Modifications to app.css ===
+
+Changes made to app.css don't get picked up unless you do a full `./gradlew clean` first, which is painful.
+
+Adding the following line to build.gradle.kts seems to fix this:
+
+[source,kotlin]
+----
+tasks.withType(KotlinWebpack::class.java).forEach { t ->
+    t.inputs.files(fileTree("src/jsMain/resources"))
+}
+----
+
+=== Getting --continuous working ===
+
+Even with the above fix, --continuous doesn't seem to work. 🤷
+
+== Future Topics ==
+
+* link:https://tailwindcss.com/docs/installation#building-for-production[Building for Production]

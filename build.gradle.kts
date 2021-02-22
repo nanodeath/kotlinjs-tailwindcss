@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack
 
 plugins {
-    kotlin("multiplatform") version "1.4.30"
+    kotlin("multiplatform") version "1.4.21"
     application
 }
 
@@ -44,6 +44,11 @@ kotlin {
         val jsMain by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-html:0.7.2")
+                implementation("org.jetbrains:kotlin-extensions:1.0.1-pre.148-kotlin-1.4.21")
+                implementation(npm("postcss", "8.2.6"))
+                implementation(npm("postcss-loader", "4.2.0")) // 5.0.0 seems not to work
+                implementation(npm("autoprefixer", "10.2.4"))
+                implementation(npm("tailwindcss", "2.0.3"))
             }
         }
         val jsTest by getting {
@@ -61,6 +66,8 @@ application {
 tasks.getByName<KotlinWebpack>("jsBrowserProductionWebpack") {
     outputFileName = "js.js"
 }
+
+tasks.withType(KotlinWebpack::class.java).forEach { it.inputs.files(fileTree("src/jsMain/resources")) }
 
 tasks.getByName<Jar>("jvmJar") {
     dependsOn(tasks.getByName("jsBrowserProductionWebpack"))
