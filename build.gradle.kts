@@ -1,7 +1,8 @@
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack
 
 plugins {
-    kotlin("multiplatform") version "1.4.21"
+    kotlin("multiplatform") version "1.5.20"
+    id("com.github.ben-manes.versions") version "0.39.0"
     application
 }
 
@@ -9,11 +10,13 @@ group = "com.example"
 version = "1.0-SNAPSHOT"
 
 repositories {
-    jcenter()
     mavenCentral()
     maven { url = uri("https://dl.bintray.com/kotlin/kotlinx") }
     maven { url = uri("https://dl.bintray.com/kotlin/ktor") }
 }
+
+val ktorVersion = "1.6.1"
+val kotlinxHtmlVersion = "0.7.3"
 
 kotlin {
     jvm {
@@ -35,16 +38,16 @@ kotlin {
         val commonTest by getting
         val jvmMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-server-jetty:1.5.1")
-                implementation("io.ktor:ktor-html-builder:1.5.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.7.2")
+                implementation("io.ktor:ktor-server-jetty:$ktorVersion")
+                implementation("io.ktor:ktor-html-builder:$ktorVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:$kotlinxHtmlVersion")
             }
         }
         val jvmTest by getting
         val jsMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-html:0.7.2")
-                implementation("org.jetbrains:kotlin-extensions:1.0.1-pre.148-kotlin-1.4.21")
+                implementation("org.jetbrains.kotlinx:kotlinx-html:$kotlinxHtmlVersion")
+                implementation("org.jetbrains.kotlin-wrappers:kotlin-extensions:1.0.1-pre.214-kotlin-1.5.20")
                 implementation(npm("postcss", "8.2.6"))
                 implementation(npm("postcss-loader", "4.2.0")) // 5.0.0 seems not to work
                 implementation(npm("autoprefixer", "10.2.4"))
