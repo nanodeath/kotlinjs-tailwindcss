@@ -9,11 +9,8 @@ group = "com.example"
 version = "1.0-SNAPSHOT"
 
 repositories {
-    jcenter()
     mavenCentral()
-    maven { url = uri("https://dl.bintray.com/kotlin/kotlinx") }
-    maven { url = uri("https://dl.bintray.com/kotlin/ktor") }
-}
+    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }}
 
 // JVM
 val ktorVersion: String by project
@@ -38,6 +35,11 @@ kotlin {
         browser {
             commonWebpackConfig {
                 cssSupport.enabled = true
+            }
+            testTask {
+                useKarma {
+                    useFirefox()
+                }
             }
         }
     }
@@ -92,3 +94,6 @@ tasks.getByName<JavaExec>("run") {
     dependsOn(jvmJarTask)
     classpath(jvmJarTask)
 }
+
+// Suppresses a "without declaring an explicit or implicit dependency" warning
+tasks.getByName("startScripts").dependsOn("metadataJar")
